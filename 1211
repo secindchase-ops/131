@@ -1,452 +1,63 @@
 --==================================================
--- M8 HUB | MAXIMUM ANTI-KICK BYPASS + ALL FEATURES
--- LocalScript (ULTIMATE VERSION - FIXED)
+-- M8 HUB | WHITELIST + AUTO LOAD (LocalScript)
 --==================================================
 
 local Players = game:GetService("Players")
+local LP = Players.LocalPlayer
+local HttpService = game:GetService("HttpService")
+local RunService = game:GetService("RunService")
+
+-- Owner IDs (always allowed)
+local OWNERS = {8828510948, 7152975199} -- add yourself here if needed
+
+-- Pastebin raw URL for whitelist
+local WHITELIST_URL = "https://pastebin.com/raw/BpmxXgjB"
+
+-- Cache for whitelist
+local whitelistCache = {}
+
+-- Fetch whitelist from Pastebin
+local function fetchWhitelist()
+    local ids = {}
+    local success, result = pcall(function()
+        return game:HttpGet(WHITELIST_URL)
+    end)
+    if success and result then
+        for id in result:gmatch("%d+") do
+            table.insert(ids, tonumber(id))
+        end
+    else
+        warn("❌ Failed to fetch whitelist from Pastebin")
+    end
+    return ids
+end
+
+-- Check if player is allowed
+local function isAllowed()
+    for _, id in ipairs(OWNERS) do
+        if LP.UserId == id then return true end
+    end
+    for _, id in ipairs(whitelistCache) do
+        if LP.UserId == id then return true end
+    end
+    return false
+end
+
+-- Function to load your M8 HUB code
+local function loadM8Hub()
+    if _G.M8HubLoaded then return end
+    _G.M8HubLoaded = true
+    --==================================================
+   --==================================================
+-- M8 HUB | FULL VERSION + TP CYLINDER + BEAM + DISTANCE + FFLAG DESYNC
+--==================================================
+
+-- SERVICES
+local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
 local RunService = game:GetService("RunService")
-local ScriptContext = game:GetService("ScriptContext")
-local TeleportService = game:GetService("TeleportService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Workspace = game:GetService("Workspace")
-local Lighting = game:GetService("Lighting")
-local NetworkClient = game:GetService("NetworkClient")
-local HttpService = game:GetService("HttpService")
-local Stats = game:GetService("Stats")
+local ProxService = game:GetService("ProximityPromptService")
 local LP = Players.LocalPlayer
-
---==================================================
--- DESYNC BOX SYSTEM (NEW FEATURE)
---==================================================
-local desyncBox = nil
-local desyncBoxColor = Color3.fromRGB(255, 0, 0) -- Red color
-local desyncBoxTransparency = 0.3
-
-local function updateDesyncBox()
-    if desyncBox then
-        desyncBox:Destroy()
-        desyncBox = nil
-    end
-    
-    if desyncOn then
-        local char, hrp = getCharacterParts()
-        if hrp then
-            -- Create new box at character position
-            local box = Instance.new("Part")
-            box.Name = "M8_DesyncBox"
-            box.Size = Vector3.new(6, 6, 6) -- Slightly larger box
-            box.Position = hrp.Position
-            box.Anchored = true
-            box.CanCollide = false
-            box.Material = EnumMaterial.Neon
-            box.Color = desyncBoxColor
-            box.Transparency = desyncBoxTransparency
-            
-            -- Add wireframe for better visibility
-            local wireframe = Instance.new("WireframeHandleAdornment")
-            wireframe.Name = "Wireframe"
-            wireframe.Adornee = box
-            wireframe.Color3 = Color3.fromRGB(255, 50, 50)
-            wireframe.Transparency = 0.1
-            wireframe.Parent = box
-            
-            -- Make box follow character
-            task.spawn(function()
-                while desyncOn and box and box.Parent do
-                    task.wait(0.05)
-                    if hrp and hrp.Parent then
-                        box.Position = hrp.Position
-                    else
-                        break
-                    end
-                end
-                if box and box.Parent then
-                    box:Destroy()
-                end
-            end)
-            
-            box.Parent = Workspace
-            desyncBox = box
-        end
-    end
-end
-
--- Update the getCharacterParts function to be defined earlier
-local function getCharacterParts()
-    local char = LP.Character
-    if not char then return nil, nil, nil end
-    
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    local hum = char:FindFirstChild("Humanoid")
-    
-    return char, hrp, hum
-end
-
---==================================================
--- MAXIMUM ANTI-KICK BYPASS SYSTEM (15 LAYERS - FIXED)
---==================================================
-local function setupMaximumAntiKick()
-    print("[M8] Loading MAXIMUM anti-kick bypass system...")
-    
-    local kickAttempts = 0
-    local antiKickLogs = {}
-    local protectionEnabled = true
-    
-    -- 1. DEEP METATABLE PROTECTION
-    pcall(function()
-        local success, mt = pcall(getrawmetatable, game)
-        if success and mt then
-            local oldNamecall = mt.__namecall
-            local oldIndex = mt.__index
-            local oldNewIndex = mt.__newindex
-            
-            setreadonly(mt, false)
-            
-            mt.__namecall = newcclosure(function(self, ...)
-                local method = getnamecallmethod()
-                local args = {...}
-                
-                if method and tostring(method):lower():find("kick") then
-                    kickAttempts = kickAttempts + 1
-                    table.insert(antiKickLogs, "Blocked kick: " .. method)
-                    return nil
-                end
-                
-                return oldNamecall(self, ...)
-            end)
-            
-            setreadonly(mt, true)
-            print("[M8] ✓ Metatable protection loaded")
-        end
-    end)
-    
-    -- 2. ERROR INTERCEPTION
-    pcall(function()
-        ScriptContext.Error:Connect(function(message, stack, source)
-            local msg = tostring(message):lower()
-            if msg:find("bac%-8363") or msg:find("267") or msg:find("268") or msg:find("kick") then
-                kickAttempts = kickAttempts + 1
-                table.insert(antiKickLogs, "Blocked error: " .. msg:sub(1, 50))
-                return
-            end
-        end)
-        print("[M8] ✓ Error interception loaded")
-    end)
-    
-    -- 3. REMOTE PROTECTION
-    pcall(function()
-        game.DescendantAdded:Connect(function(obj)
-            if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
-                local name = obj.Name:lower()
-                if name:find("kick") or name:find("ban") or name:find("punish") then
-                    kickAttempts = kickAttempts + 1
-                    table.insert(antiKickLogs, "Blocked remote: " .. obj.Name)
-                    
-                    if obj:IsA("RemoteEvent") then
-                        obj.OnClientEvent:Connect(function()
-                            return nil
-                        end)
-                    elseif obj:IsA("RemoteFunction") then
-                        obj.OnClientInvoke = function()
-                            return true
-                        end
-                    end
-                end
-            end
-        end)
-        print("[M8] ✓ Remote protection loaded")
-    end)
-    
-    -- 4. FFLAG PROTECTION (50+ FLAGS)
-    pcall(function()
-        local protectiveFFlags = {
-            -- Anti-kick flags
-            "DFFlagDebugDisableAutomaticPhysicsFixes2",
-            "DFFlagDebugDisableAutomaticPhysicsFixes",
-            "FFlagDebugDisableKick",
-            "FIntKickTimeout",
-            "FIntBanTimeout",
-            
-            -- Network optimization
-            "FIntPhysicsSenderRate",
-            "FIntNetworkSendRate",
-            "FIntNetworkReceiveRate",
-            "FIntNetworkPhysicsSendRate",
-            "FIntNetworkPhysicsReceiveRate",
-            
-            -- Detection bypass
-            "DFFlagDebugDisableAntiCheat",
-            "FFlagDebugDisableAntiCheatChecks",
-            "FFlagDebugDisableAntiExploitScanning",
-            "FFlagDebugDisableAntiExploit",
-            "FFlagDebugDisableSecurity",
-            
-            -- Performance
-            "FIntMaxPhysicsPacketsPerSecond",
-            "FIntMaxNetworkPacketsPerSecond",
-            "FIntMaxEventPacketsPerSecond",
-        }
-        
-        for _, flag in ipairs(protectiveFFlags) do
-            pcall(function()
-                setfflag(flag, "true")
-            end)
-        end
-        print("[M8] ✓ FFlag protection loaded")
-    end)
-    
-    -- 5. NETWORK PROTECTION
-    pcall(function()
-        setfflag("DFIntNetworkSendBufferSizeKB", "1024")
-        setfflag("DFIntNetworkReceiveBufferSizeKB", "1024")
-        setfflag("DFFlagDebugDisableStrictNetworkChecks", "true")
-        setfflag("FFlagDebugDisableNetworkValidation", "true")
-        setfflag("DFFlagDebugDisablePacketMonitoring", "true")
-        print("[M8] ✓ Network protection loaded")
-    end)
-    
-    -- 6. TELEPORT PROTECTION (FIXED VERSION)
-    pcall(function()
-        -- Store original functions safely
-        local teleportSuccess, teleportInfo = pcall(function()
-            return {TeleportService.Teleport, TeleportService.TeleportAsync}
-        end)
-        
-        if teleportSuccess then
-            local originalTeleport = teleportInfo[1]
-            local originalTeleportAsync = teleportInfo[2]
-            
-            -- Only hook if they exist
-            if originalTeleport then
-                TeleportService.Teleport = function(placeId, ...)
-                    if placeId == 0 or placeId == nil then
-                        table.insert(antiKickLogs, "Blocked teleport kick")
-                        return
-                    end
-                    return originalTeleport(placeId, ...)
-                end
-            end
-            
-            if originalTeleportAsync then
-                TeleportService.TeleportAsync = function(placeId, ...)
-                    if placeId == 0 or placeId == nil then
-                        table.insert(antiKickLogs, "Blocked teleport async kick")
-                        return
-                    end
-                    return originalTeleportAsync(placeId, ...)
-                end
-            end
-            print("[M8] ✓ Teleport protection loaded")
-        end
-    end)
-    
-    -- 7. CHARACTER PROTECTION
-    pcall(function()
-        LP.CharacterAdded:Connect(function(char)
-            task.wait(1)
-            local humanoid = char:WaitForChild("Humanoid", 5)
-            if humanoid then
-                humanoid.Died:Connect(function()
-                    task.wait(1)
-                    if LP.Character == nil then
-                        table.insert(antiKickLogs, "Character protection active")
-                    end
-                end)
-            end
-            -- Update desync box when character respawns
-            if desyncOn then
-                task.wait(1)
-                updateDesyncBox()
-            end
-        end)
-        print("[M8] ✓ Character protection loaded")
-    end)
-    
-    -- 8. GLOBAL FUNCTION HOOKS
-    pcall(function()
-        local originalError = error
-        local originalWarn = warn
-        
-        error = function(msg, level)
-            if type(msg) == "string" and msg:lower():find("kick") then
-                table.insert(antiKickLogs, "Blocked error() call")
-                return
-            end
-            return originalError(msg, level)
-        end
-        
-        warn = function(...)
-            local args = {...}
-            for _, msg in ipairs(args) do
-                if type(msg) == "string" and msg:lower():find("kick") then
-                    table.insert(antiKickLogs, "Blocked warn() call")
-                    return
-                end
-            end
-            return originalWarn(...)
-        end
-        print("[M8] ✓ Global function hooks loaded")
-    end)
-    
-    -- 9. MEMORY PROTECTION
-    pcall(function()
-        local originalGcinfo = gcinfo
-        if type(originalGcinfo) == "function" then
-            gcinfo = function()
-                local result = originalGcinfo()
-                if result > 1000 then
-                    return 500
-                end
-                return result
-            end
-            print("[M8] ✓ Memory protection loaded")
-        end
-    end)
-    
-    -- 10. EVENT LOGGING PROTECTION
-    pcall(function()
-        setfflag("DFFlagDebugDisableEventLogging", "true")
-        setfflag("FFlagDebugDisableAnalytics", "true")
-        print("[M8] ✓ Event logging protection loaded")
-    end)
-    
-    -- 11. SCREENSHOT PROTECTION
-    pcall(function()
-        setfflag("DFFlagDebugDisableScreenshotDetection", "true")
-        print("[M8] ✓ Screenshot protection loaded")
-    end)
-    
-    -- 12. PERFORMANCE PROTECTION
-    pcall(function()
-        task.spawn(function()
-            while protectionEnabled do
-                task.wait(30)
-                -- Refresh essential flags only
-                local essentialFlags = {
-                    "FFlagDebugDisableKick",
-                    "DFFlagDebugDisableAutomaticPhysicsFixes2",
-                    "FIntPhysicsSenderRate",
-                    "FIntNetworkSendRate"
-                }
-                for _, flag in ipairs(essentialFlags) do
-                    pcall(function()
-                        setfflag(flag, "true")
-                    end)
-                end
-            end
-        end)
-        print("[M8] ✓ Performance protection loaded")
-    end)
-    
-    -- 13. REMOTE SCANNING PROTECTION
-    pcall(function()
-        task.spawn(function()
-            task.wait(3)
-            local folders = {ReplicatedStorage, Workspace, game}
-            for _, folder in ipairs(folders) do
-                pcall(function()
-                    for _, obj in pairs(folder:GetDescendants()) do
-                        if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
-                            local name = obj.Name:lower()
-                            if name:find("kick") or name:find("ban") or name:find("anticheat") then
-                                table.insert(antiKickLogs, "Found suspicious remote: " .. obj.Name)
-                            end
-                        end
-                    end
-                end)
-            end
-        end)
-        print("[M8] ✓ Remote scanning protection loaded")
-    end)
-    
-    -- 14. SAFETY MODE
-    pcall(function()
-        local safetyMode = false
-        RunService.Heartbeat:Connect(function()
-            if kickAttempts > 15 and not safetyMode then
-                safetyMode = true
-                table.insert(antiKickLogs, "SAFETY MODE ACTIVATED")
-                
-                -- Emergency measures
-                pcall(function()
-                    -- Reset character
-                    local char = LP.Character
-                    if char then
-                        local hrp = char:FindFirstChild("HumanoidRootPart")
-                        if hrp then
-                            hrp.AssemblyLinearVelocity = Vector3.zero
-                            hrp.AssemblyAngularVelocity = Vector3.zero
-                        end
-                    end
-                    
-                    -- Remove desync box during safety mode
-                    if desyncBox then
-                        desyncBox:Destroy()
-                        desyncBox = nil
-                    end
-                    
-                    -- Maximum protection
-                    local emergencyFlags = {
-                        "FFlagDebugDisableKick", 
-                        "DFFlagDebugDisableAutomaticPhysicsFixes2",
-                        "DFFlagDebugDisableAntiCheat"
-                    }
-                    for _, flag in ipairs(emergencyFlags) do
-                        pcall(function()
-                            setfflag(flag, "true")
-                        end)
-                    end
-                end)
-                
-                task.wait(10)
-                safetyMode = false
-                kickAttempts = 0
-                -- Restore desync box if desync is on
-                if desyncOn then
-                    updateDesyncBox()
-                end
-                table.insert(antiKickLogs, "SAFETY MODE ENDED")
-            end
-        end)
-        print("[M8] ✓ Safety mode loaded")
-    end)
-    
-    -- 15. FINAL PROTECTION LAYER
-    pcall(function()
-        LP.OnTeleport:Connect(function(state)
-            if state == Enum.TeleportState.Failed then
-                table.insert(antiKickLogs, "Teleport failed recovery")
-                task.wait(2)
-                pcall(function()
-                    TeleportService:Teleport(game.PlaceId, LP)
-                end)
-            end
-        end)
-        print("[M8] ✓ Final protection layer loaded")
-    end)
-    
-    print("[M8] ✓ 15-Layer Anti-Kick System Fully Loaded")
-    
-    return {
-        GetKickAttempts = function() return kickAttempts end,
-        GetLogs = function() return antiKickLogs end
-    }
-end
-
--- Start maximum anti-kick system (with error handling)
-local AntiKickSystem
-local success, err = pcall(function()
-    AntiKickSystem = setupMaximumAntiKick()
-end)
-
-if not success then
-    warn("[M8] Anti-kick system had minor errors, but script continues...")
-    AntiKickSystem = {
-        GetKickAttempts = function() return 0 end,
-        GetLogs = function() return {} end
-    }
-end
 
 --==================================================
 -- CLEAN OLD GUI
@@ -456,439 +67,497 @@ pcall(function()
 end)
 
 --==================================================
--- GUI WITH TOGGLE CONTROLS
+-- AUTO SCALE PER DEVICE
+--==================================================
+local cam = workspace.CurrentCamera.ViewportSize
+local scale = cam.X < 700 and 0.85 or cam.X < 1000 and 0.95 or 1
+
+--==================================================
+-- GUI BASE
 --==================================================
 local gui = Instance.new("ScreenGui", CoreGui)
 gui.Name = "M8_HUB"
-gui.ResetOnSpawn = false
-gui.IgnoreGuiInset = true
 
 local main = Instance.new("Frame", gui)
-main.Size = UDim2.new(0, 350, 0, 320)
-main.Position = UDim2.new(0.5, -175, 0.5, -160)
-main.BackgroundColor3 = Color3.fromRGB(30, 10, 60)
-main.BackgroundTransparency = 0.1
+main.Size = UDim2.new(0, 340 * scale, 0, 380 * scale)
+main.Position = UDim2.new(0.5, -170 * scale, 0.5, -190 * scale)
+main.BackgroundColor3 = Color3.fromRGB(90, 40, 140)
+main.BackgroundTransparency = 0.28
 main.BorderSizePixel = 0
 main.Active = true
 main.Draggable = true
+Instance.new("UICorner", main).CornerRadius = UDim.new(0, 20)
 
--- Title
+-- NEON STROKE
+local stroke = Instance.new("UIStroke", main)
+stroke.Color = Color3.fromRGB(180, 80, 255)
+stroke.Thickness = 2
+stroke.Transparency = 0.2
+
+-- NEON GLOW ANIMATION
+spawn(function()
+    while task.wait(0.05) do
+        local v = 160 + math.sin(tick()*2)*40
+        stroke.Color = Color3.fromRGB(v, 60, 255)
+    end
+end)
+
+--==================================================
+-- SOUNDS
+--==================================================
+local function playSound(id)
+    local s = Instance.new("Sound", main)
+    s.SoundId = "rbxassetid://"..id
+    s.Volume = 0.6
+    s:Play()
+    game.Debris:AddItem(s, 2)
+end
+
+local SND_ON = 6026984224
+local SND_OFF = 9118828560
+local SND_CLICK = 12221967
+
+--==================================================
+-- TITLE / STATUS
+--==================================================
 local title = Instance.new("TextLabel", main)
-title.Size = UDim2.new(1, 0, 0, 40)
-title.Position = UDim2.new(0, 0, 0, 10)
+title.Size = UDim2.new(1, -20, 0, 40)
+title.Position = UDim2.new(0, 10, 0, 10)
 title.BackgroundTransparency = 1
-title.Text = "PvpHub"
+title.Text = "👾 M8 HUB"
 title.Font = Enum.Font.GothamBold
-title.TextSize = 24
+title.TextSize = 22
 title.TextColor3 = Color3.new(1,1,1)
 
--- Protection status
-local protectionStatus = Instance.new("TextLabel", main)
-protectionStatus.Size = UDim2.new(1, 0, 0, 22)
-protectionStatus.Position = UDim2.new(0, 0, 0, 50)
-protectionStatus.BackgroundTransparency = 1
-protectionStatus.Text = "🛡️ 15-Layer Anti-Kick ACTIVE"
-protectionStatus.Font = Enum.Font.Gotham
-protectionStatus.TextSize = 14
-protectionStatus.TextColor3 = Color3.fromRGB(100, 255, 100)
-
--- Feature status
 local status = Instance.new("TextLabel", main)
-status.Size = UDim2.new(1, 0, 0, 22)
-status.Position = UDim2.new(0, 0, 0, 75)
+status.Size = UDim2.new(1, -20, 0, 26)
+status.Position = UDim2.new(0, 10, 0, 55)
 status.BackgroundTransparency = 1
-status.Text = "Click buttons to toggle features"
+status.Text = "Listening for Steal... 👻"
 status.Font = Enum.Font.Gotham
-status.TextSize = 14
+status.TextSize = 16
 status.TextColor3 = Color3.fromRGB(230,200,255)
 
--- Button creator
+--==================================================
+-- BUTTON FACTORY
+--==================================================
 local function makeButton(text, y)
     local b = Instance.new("TextButton", main)
-    b.Size = UDim2.new(0.9, 0, 0, 40)
+    b.Size = UDim2.new(0.9, 0, 0, 38 * scale)
     b.Position = UDim2.new(0.05, 0, 0, y)
-    b.Text = "◻ " .. text .. " (OFF)"
+    b.Text = text
     b.Font = Enum.Font.GothamBold
     b.TextSize = 16
     b.TextColor3 = Color3.new(1,1,1)
-    b.BackgroundColor3 = Color3.fromRGB(80, 0, 80)
-    b.BorderSizePixel = 0
+    b.BackgroundColor3 = Color3.fromRGB(120, 0, 120)
+    b.BackgroundTransparency = 0.15
     b.AutoButtonColor = false
-    
-    local indicator = Instance.new("Frame", b)
-    indicator.Size = UDim2.new(0, 6, 1, -4)
-    indicator.Position = UDim2.new(0, 2, 0, 2)
-    indicator.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
-    indicator.BorderSizePixel = 0
-    indicator.Name = "Indicator"
-    
-    b.MouseEnter:Connect(function()
-        b.BackgroundColor3 = Color3.fromRGB(100, 0, 100)
-    end)
-    
-    b.MouseLeave:Connect(function()
-        b.BackgroundColor3 = Color3.fromRGB(80, 0, 80)
-    end)
-    
-    return b, indicator
+    b.BorderSizePixel = 0
+    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 10)
+    return b
 end
 
--- Create buttons
-local desyncBtn, desyncIndicator = makeButton("Desync + Box", 105)
-local speedBtn, speedIndicator = makeButton("Speed", 155)
-local spinBtn, spinIndicator = makeButton("Spin", 205)
-local allBtn, allIndicator = makeButton("ALL ON/OFF", 255)
-
--- Button update function
-local function updateButton(button, indicator, isOn, text)
-    if isOn then
-        button.Text = "✓ " .. text .. " (ON)"
-        indicator.BackgroundColor3 = Color3.fromRGB(50, 255, 50)
-        button.BackgroundColor3 = Color3.fromRGB(0, 100, 0)
-    else
-        button.Text = "◻ " .. text .. " (OFF)"
-        indicator.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
-        button.BackgroundColor3 = Color3.fromRGB(80, 0, 80)
-    end
+local function toggleColor(btn, on)
+    btn.BackgroundColor3 = on
+        and Color3.fromRGB(255, 0, 200)
+        or Color3.fromRGB(120, 0, 120)
 end
 
 --==================================================
--- FEATURE STATES
+-- BUTTONS
 --==================================================
-local desyncOn = false
-local speedOn = false
-local spinOn = false
-local allOn = false
+local y = 95 * scale
+local setTPBtn = makeButton("📍 Set TP", y); y += 45 * scale
+local desyncBtn = makeButton("😈 Desync", y); y += 45 * scale
+local unwalkBtn = makeButton("👻 Unwalk", y); y += 45 * scale
+local speedBtn  = makeButton("⚡ Speed", y)
 
--- Connections
-local speedConn = nil
-local spinConn = nil
 
 --==================================================
--- DESYNC SYSTEM (UPDATED WITH BOX FEATURE)
+-- LOGIC VARIABLES
 --==================================================
-local function toggleDesync(on)
-    if on then
-        pcall(function()
-            setfflag("GameNetPVHeaderRotationalVelocityZeroCutoffExponent", "-5000")
-            setfflag("GameNetPVHeaderLinearVelocityZeroCutoffExponent", "-5000")
-            setfflag("MaxDataPacketPerSend", "2147483647")
-            setfflag("PhysicsSenderMaxBandwidthBps", "20000")
+local tpPos
+local tpBeam, tpCylinder, distanceLabel
+local desyncOn, unwalkOn, speedOn = false,false,false
+local speedConn, unwalkTrack
+
+--==================================================
+-- SET TP WITH CYLINDER + BEAM + DISTANCE
+--==================================================
+setTPBtn.MouseButton1Click:Connect(function()
+    playSound(SND_CLICK)
+    local char = LP.Character
+    if char and char:FindFirstChild("HumanoidRootPart") then
+        tpPos = char.HumanoidRootPart.Position
+        status.Text = "TP Set ✅"
+
+        -- Remove old visuals
+        if tpBeam then tpBeam:Destroy() end
+        if tpCylinder then tpCylinder:Destroy() end
+        if distanceLabel then distanceLabel:Destroy() end
+
+        -- Cylinder at TP
+        tpCylinder = Instance.new("Part")
+        tpCylinder.Anchored = true
+        tpCylinder.CanCollide = false
+        tpCylinder.Material = Enum.Material.Neon
+        tpCylinder.Color = Color3.fromRGB(0, 255, 200)
+        tpCylinder.Size = Vector3.new(6,1,6)
+        tpCylinder.CFrame = CFrame.new(tpPos)
+        tpCylinder.Shape = Enum.PartType.Cylinder
+        tpCylinder.Orientation = Vector3.new(0,0,0)
+        tpCylinder.Parent = workspace
+
+        -- Beam from player to cylinder
+        tpBeam = Instance.new("Part")
+        tpBeam.Anchored = true
+        tpBeam.CanCollide = false
+        tpBeam.Material = Enum.Material.Neon
+        tpBeam.Color = Color3.fromRGB(255, 0, 200)
+        tpBeam.Transparency = 0.2
+        tpBeam.Size = Vector3.new(1,1,(tpPos - char.HumanoidRootPart.Position).Magnitude)
+        tpBeam.CFrame = CFrame.new(char.HumanoidRootPart.Position, tpPos) * CFrame.new(0,0,-tpBeam.Size.Z/2)
+        tpBeam.Parent = workspace
+
+        -- Distance label above cylinder
+        distanceLabel = Instance.new("BillboardGui", tpCylinder)
+        distanceLabel.Adornee = tpCylinder
+        distanceLabel.Size = UDim2.new(0,100,0,50)
+        distanceLabel.StudsOffset = Vector3.new(0,3,0)
+        distanceLabel.AlwaysOnTop = true
+
+        local txt = Instance.new("TextLabel", distanceLabel)
+        txt.Size = UDim2.new(1,0,1,0)
+        txt.BackgroundTransparency = 1
+        txt.TextColor3 = Color3.fromRGB(255,255,255)
+        txt.Font = Enum.Font.GothamBold
+        txt.TextScaled = true
+
+        -- Dynamic update
+        local conn
+        conn = RunService.RenderStepped:Connect(function()
+            if not tpBeam or not char:FindFirstChild("HumanoidRootPart") then
+                conn:Disconnect()
+                return
+            end
+            local hrpPos = char.HumanoidRootPart.Position
+            tpBeam.Size = Vector3.new(1,1,(tpPos - hrpPos).Magnitude)
+            tpBeam.CFrame = CFrame.new(hrpPos, tpPos) * CFrame.new(0,0,-tpBeam.Size.Z/2)
+            txt.Text = string.format("%.1f studs", (tpPos - hrpPos).Magnitude)
         end)
-        
-        local char, hrp = getCharacterParts()
-        if hrp then
-            hrp.AssemblyLinearVelocity = Vector3.zero
-            hrp.AssemblyAngularVelocity = Vector3.zero
-        end
-        
-        -- Create desync box
-        updateDesyncBox()
-        
-        status.Text = "✅ Desync ON + Box"
-    else
-        -- Remove desync box
-        if desyncBox then
-            desyncBox:Destroy()
-            desyncBox = nil
-        end
-        
-        status.Text = "✅ Desync OFF"
     end
-end
+end)
+--------------- teleport
 
-desyncBtn.MouseButton1Click:Connect(function()
-    desyncOn = not desyncOn
-    updateButton(desyncBtn, desyncIndicator, desyncOn, "Desync + Box")
-    toggleDesync(desyncOn)
+
+
+
+
+
+
+--==================================================
+-- TELEPORT BUTTON (click once to enable Desync + load GUI)
+--==================================================
+local teleportBtn = makeButton("🛸 Teleport", y + 45 * scale)
+local teleportGUIActive = false
+
+teleportBtn.MouseButton1Click:Connect(function()
+    playSound(SND_CLICK)
+
+    -- Enable Desync only once
+    if not desyncActivated then
+        desyncActivated = true
+        toggleColor(desyncBtn, true)
+        for name, value in pairs(FFlags) do
+            pcall(function() setfflag(tostring(name), tostring(value)) end)
+        end
+        status.Text = "Desync Enabled ✅"
+    end
+
+    -- Load Teleport GUI only once
+    if teleportGUIActive then return end
+    teleportGUIActive = true
+
+    local Players = game:GetService("Players")
+    local LP = Players.LocalPlayer
+    local teleportTarget = nil
+
+    -- GUI FRAME
+    local GUIFrame = Instance.new("Frame")
+    GUIFrame.Name = "TeleportGUI"
+    GUIFrame.Size = UDim2.new(0, 220, 0, 300)
+    GUIFrame.Position = UDim2.new(0.75, 0, 0.1, 0)
+    GUIFrame.BackgroundColor3 = Color3.fromRGB(35,35,35)
+    GUIFrame.BorderSizePixel = 0
+    GUIFrame.Parent = gui
+    Instance.new("UICorner", GUIFrame).CornerRadius = UDim.new(0,10)
+
+    -- TITLE
+    local Title = Instance.new("TextLabel")
+    Title.Size = UDim2.new(1,0,0,30)
+    Title.BackgroundColor3 = Color3.fromRGB(50,50,50)
+    Title.Text = "Teleport GUI"
+    Title.TextColor3 = Color3.fromRGB(255,255,255)
+    Title.Font = Enum.Font.GothamBold
+    Title.TextSize = 14
+    Title.Parent = GUIFrame
+    Instance.new("UICorner", Title).CornerRadius = UDim.new(0,10)
+
+    -- PLAYER LIST
+    local Scroll = Instance.new("ScrollingFrame")
+    Scroll.Size = UDim2.new(1,-10,1,-70)
+    Scroll.Position = UDim2.new(0,5,0,35)
+    Scroll.BackgroundColor3 = Color3.fromRGB(25,25,25)
+    Scroll.CanvasSize = UDim2.new(0,0,0,0)
+    Scroll.Parent = GUIFrame
+
+    local UIList = Instance.new("UIListLayout")
+    UIList.Parent = Scroll
+    UIList.SortOrder = Enum.SortOrder.LayoutOrder
+    UIList.Padding = UDim.new(0,5)
+
+    -- UPDATE PLAYER LIST
+    local function updatePlayers()
+        for _, c in pairs(Scroll:GetChildren()) do
+            if c:IsA("TextButton") then c:Destroy() end
+        end
+        local totalHeight = 0
+        for _, p in pairs(Players:GetPlayers()) do
+            if p ~= LP then
+                local btn = Instance.new("TextButton")
+                btn.Size = UDim2.new(1,0,0,25)
+                btn.Text = p.Name
+                btn.TextColor3 = Color3.fromRGB(255,255,255)
+                btn.BackgroundColor3 = Color3.fromRGB(45,45,45)
+                btn.Font = Enum.Font.Gotham
+                btn.TextSize = 12
+                btn.Parent = Scroll
+
+                btn.MouseButton1Click:Connect(function()
+                    teleportTarget = p.Character and p.Character:FindFirstChild("HumanoidRootPart")
+                    local char = LP.Character
+                    local hum = char:FindFirstChildOfClass("Humanoid")
+                    local hrp = char:FindFirstChild("HumanoidRootPart")
+                    if not (teleportTarget and hum and hrp) then return end
+
+                    -- Equip Flying Carpet automatically
+                    local tool = LP.Backpack:FindFirstChild("Flying Carpet") or char:FindFirstChild("Flying Carpet")
+                    if tool then tool.Parent = char end
+
+                    -- Freeze only during teleport
+                    hum.PlatformStand = true
+                    hrp.Anchored = true
+                    status.Text = "Teleporting to "..p.Name.."..."
+                    hrp.CFrame = teleportTarget.CFrame + Vector3.new(0,3,0)
+                    task.wait(0.5) -- freeze short moment
+                    hrp.Anchored = false
+                    hum.PlatformStand = false
+                    status.Text = "Teleported to "..p.Name.." ✅"
+                end)
+
+                totalHeight = totalHeight + 30
+            end
+        end
+        Scroll.CanvasSize = UDim2.new(0,0,totalHeight/Scroll.AbsoluteSize.Y,0)
+    end
+
+    Players.PlayerAdded:Connect(updatePlayers)
+    Players.PlayerRemoving:Connect(updatePlayers)
+    updatePlayers()
+end)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-- telepprt
+--==================================================
+-- TP ON BRAINROT (FLOAT 1 SECOND)
+--==================================================
+ProxService.PromptButtonHoldEnded:Connect(function(_, plr)
+    if plr ~= LP or not tpPos then return end
+    local char = LP.Character
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hum or not hrp then return end
+
+    hrp.CFrame = CFrame.new(tpPos + Vector3.new(0, 3, 0))
+    status.Text = "Brainrot stolen → Floating 🛸"
+    hum.PlatformStand = true
+    hum.WalkSpeed = 0
+    hum.JumpPower = 0
+    local originalAnchored = hrp.Anchored
+    hrp.Anchored = true
+
+    task.wait(1)
+
+    hrp.Anchored = originalAnchored
+    hum.PlatformStand = false
+    hum.WalkSpeed = 16
+    hum.JumpPower = 50
+    status.Text = "TP complete ✅"
+
+    -- Remove visuals after TP
+    if tpBeam then tpBeam:Destroy() tpBeam = nil end
+    if tpCylinder then tpCylinder:Destroy() tpCylinder = nil end
+    if distanceLabel then distanceLabel:Destroy() distanceLabel = nil end
 end)
 
 --==================================================
--- SMART SPEED SYSTEM (FIXED - WORKS WITH YOUR SCREENSHOT)
+-- DESYNC (FFLAG VERSION)
 --==================================================
-local NORMAL_SPEED = 55
-local STEAL_SPEED = 28
-local isStealing = false
-local lastCheck = 0
+local FFlags = {
+    GameNetPVHeaderRotationalVelocityZeroCutoffExponent = -5000,
+    LargeReplicatorWrite5 = true,
+    LargeReplicatorEnabled9 = true,
+    AngularVelociryLimit = 360,
+    TimestepArbiterVelocityCriteriaThresholdTwoDt = 2147483646,
+    S2PhysicsSenderRate = 15000,
+    DisableDPIScale = true,
+    MaxDataPacketPerSend = 2147483647,
+    PhysicsSenderMaxBandwidthBps = 20000,
+    TimestepArbiterHumanoidLinearVelThreshold = 21,
+    MaxMissedWorldStepsRemembered = -2147483648,
+    PlayerHumanoidPropertyUpdateRestrict = true,
+    SimDefaultHumanoidTimestepMultiplier = 0,
+    StreamJobNOUVolumeLengthCap = 2147483647,
+    DebugSendDistInSteps = -2147483648,
+    GameNetDontSendRedundantNumTimes = 1,
+    CheckPVLinearVelocityIntegrateVsDeltaPositionThresholdPercent = 1,
+    CheckPVDifferencesForInterpolationMinVelThresholdStudsPerSecHundredth = 1,
+    LargeReplicatorSerializeRead3 = true,
+    ReplicationFocusNouExtentsSizeCutoffForPauseStuds = 2147483647,
+    CheckPVCachedVelThresholdPercent = 10,
+    CheckPVDifferencesForInterpolationMinRotVelThresholdRadsPerSecHundredth = 1,
+    GameNetDontSendRedundantDeltaPositionMillionth = 1,
+    InterpolationFrameVelocityThresholdMillionth = 5,
+    StreamJobNOUVolumeCap = 2147483647,
+    InterpolationFrameRotVelocityThresholdMillionth = 5,
+    CheckPVCachedRotVelThresholdPercent = 10,
+    WorldStepMax = 30,
+    InterpolationFramePositionThresholdMillionth = 5,
+    TimestepArbiterHumanoidTurningVelThreshold = 1,
+    SimOwnedNOUCountThresholdMillionth = 2147483647,
+    GameNetPVHeaderLinearVelocityZeroCutoffExponent = -5000,
+    NextGenReplicatorEnabledWrite4 = true,
+    TimestepArbiterOmegaThou = 1073741823,
+    MaxAcceptableUpdateDelay = 1,
+    LargeReplicatorSerializeWrite4 = true
+}
 
--- Function to detect steal UI from your screenshot
-local function checkForStealUI()
-    -- Check ALL GUI elements including those in your screenshot
-    for _, obj in pairs(CoreGui:GetDescendants()) do
-        if obj:IsA("TextLabel") or obj:IsA("TextButton") or obj:IsA("TextBox") then
-            local text = tostring(obj.Text):lower()
-            
-            -- DIRECT CHECK FOR YOUR SCREENSHOT TEXT:
-            -- "Steal", "Collect", "$", "Common", "Talpa Di Fero"
-            if text:find("steal") or text:find("collect") or text:find("common") or text:find("talpa") then
-                return true
-            end
-            
-            -- Check for money symbols
-            if text:find("$") then
-                return true
-            end
-            
-            -- Check for completion text
-            if text:find("you stole") then
-                return false -- This means stealing is DONE
-            end
-        end
+local desyncActivated = false
+desyncBtn.MouseButton1Click:Connect(function()
+    if desyncActivated then return end
+    desyncActivated = true
+    toggleColor(desyncBtn, true)
+    playSound(SND_ON)
+
+    for name, value in pairs(FFlags) do
+        pcall(function()
+            setfflag(tostring(name), tostring(value))
+        end)
     end
-    return false
-end
 
--- Function to toggle speed
-local function toggleSpeed(on)
-    if on then
-        isStealing = false
-        status.Text = "✅ Speed ON (55)"
-        
-        speedConn = RunService.Heartbeat:Connect(function()
-            if not speedOn then
-                if speedConn then
-                    speedConn:Disconnect()
-                end
-                return
-            end
-            
-            local char, hrp, hum = getCharacterParts()
-            if hum and hrp then
-                -- Check for steal UI every 0.2 seconds
-                local now = tick()
-                if now - lastCheck > 0.2 then
-                    lastCheck = now
-                    
-                    local stealingActive = checkForStealUI()
-                    
-                    if stealingActive and not isStealing then
-                        isStealing = true
-                        status.Text = "✅ Stealing Mode (28)"
-                    elseif not stealingActive and isStealing then
-                        isStealing = false
-                        status.Text = "✅ Speed ON (55)"
-                    end
-                end
-                
-                -- Apply speed if moving
-                if hum.MoveDirection.Magnitude > 0 then
-                    local targetSpeed = isStealing and STEAL_SPEED or NORMAL_SPEED
-                    hrp.AssemblyLinearVelocity = Vector3.new(
-                        hum.MoveDirection.X * targetSpeed,
-                        hrp.AssemblyLinearVelocity.Y,
-                        hum.MoveDirection.Z * targetSpeed
-                    )
-                end
+    local char = LP.Character
+    if char and char:FindFirstChild("HumanoidRootPart") then
+        local hrp = char.HumanoidRootPart
+        hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+        hrp.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+    end
+
+    status.Text = "Desync Enabled ✅"
+end)
+
+--==================================================
+-- UNWALK ROBUST
+--==================================================
+unwalkBtn.MouseButton1Click:Connect(function()
+    unwalkOn = not unwalkOn
+    toggleColor(unwalkBtn, unwalkOn)
+    playSound(unwalkOn and SND_ON or SND_OFF)
+
+    local char = LP.Character
+    if not char then return end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hum then return end
+    local animator = hum:FindFirstChildOfClass("Animator") or Instance.new("Animator", hum)
+
+    if unwalkOn then
+        if not unwalkTrack then
+            local anim = Instance.new("Animation")
+            anim.AnimationId = "rbxassetid://507771019"
+            unwalkTrack = animator:LoadAnimation(anim)
+            unwalkTrack.Priority = Enum.AnimationPriority.Action
+        end
+        unwalkTrack:Play()
+        unwalkTrack:AdjustSpeed(0)
+
+        RunService:BindToRenderStep("M8_UNWALK", 300, function()
+            for _, tr in ipairs(animator:GetPlayingAnimationTracks()) do
+                if tr ~= unwalkTrack then tr:Stop() end
             end
         end)
-        
-        -- Reset on character death
-        LP.CharacterAdded:Connect(function()
-            task.wait(1)
-            isStealing = false
-            if speedOn then
-                status.Text = "✅ Speed ON (55)"
-            end
-        end)
-        
     else
-        if speedConn then
-            speedConn:Disconnect()
-            speedConn = nil
-        end
-        isStealing = false
-        status.Text = "✅ Speed OFF"
+        RunService:UnbindFromRenderStep("M8_UNWALK")
+        if unwalkTrack then unwalkTrack:Stop() end
     end
-end
+end)
 
+--==================================================
+-- SPEED BOOST
+--==================================================
 speedBtn.MouseButton1Click:Connect(function()
     speedOn = not speedOn
-    updateButton(speedBtn, speedIndicator, speedOn, "Speed")
-    toggleSpeed(speedOn)
-end)
+    toggleColor(speedBtn, speedOn)
+    playSound(speedOn and SND_ON or SND_OFF)
 
---==================================================
--- SPIN SYSTEM
---==================================================
-local SPIN_RADIANS = 12000 * (math.pi / 180)
-
-local function toggleSpin(on)
-    if on then
-        status.Text = "✅ Spin ON"
-        
-        spinConn = RunService.Heartbeat:Connect(function()
-            if not spinOn then
-                if spinConn then
-                    spinConn:Disconnect()
-                end
-                return
-            end
-            
-            local char, hrp = getCharacterParts()
-            if hrp then
-                hrp.AssemblyAngularVelocity = Vector3.new(0, SPIN_RADIANS * 0.8, 0)
-                
-                -- Anti-fling
-                local velocity = hrp.AssemblyLinearVelocity
-                if velocity.Magnitude > 100 then
-                    hrp.AssemblyLinearVelocity = Vector3.new(
-                        velocity.X * 0.5,
-                        math.min(velocity.Y, 10),
-                        velocity.Z * 0.5
-                    )
-                end
+    if speedOn then
+        speedConn = RunService.RenderStepped:Connect(function()
+            local char = LP.Character
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            if hum and hrp and hum.MoveDirection.Magnitude > 0 then
+                hrp.AssemblyLinearVelocity =
+                    Vector3.new(hum.MoveDirection.X * 28, hrp.AssemblyLinearVelocity.Y, hum.MoveDirection.Z * 28)
             end
         end)
-        
     else
-        if spinConn then
-            spinConn:Disconnect()
-            spinConn = nil
-        end
-        
-        local char, hrp = getCharacterParts()
-        if hrp then
-            hrp.AssemblyAngularVelocity = Vector3.zero
-        end
-        
-        status.Text = "✅ Spin OFF"
+        if speedConn then speedConn:Disconnect() end
     end
+end)
+
+    --==================================================
+    print("✅ You are whitelisted! Load your M8 HUB here.")
+    -- Example: require(script.M8Hub) or paste your full M8 code here
 end
 
-spinBtn.MouseButton1Click:Connect(function()
-    spinOn = not spinOn
-    updateButton(spinBtn, spinIndicator, spinOn, "Spin")
-    toggleSpin(spinOn)
-end)
-
 --==================================================
--- ALL ON/OFF TOGGLE
+-- Auto-update whitelist loop
 --==================================================
-allBtn.MouseButton1Click:Connect(function()
-    if not allOn then
-        -- Turn ALL ON
-        allOn = true
-        
-        if not desyncOn then
-            desyncOn = true
-            updateButton(desyncBtn, desyncIndicator, true, "Desync + Box")
-            toggleDesync(true)
-        end
-        
-        if not speedOn then
-            speedOn = true
-            updateButton(speedBtn, speedIndicator, true, "Smart Speed")
-            toggleSpeed(true)
-        end
-        
-        if not spinOn then
-            spinOn = true
-            updateButton(spinBtn, spinIndicator, true, "Spin")
-            toggleSpin(true)
-        end
-        
-        updateButton(allBtn, allIndicator, true, "ALL ON/OFF")
-        status.Text = "✅ ALL FEATURES ON"
-        
-    else
-        -- Turn ALL OFF
-        allOn = false
-        
-        if desyncOn then
-            desyncOn = false
-            updateButton(desyncBtn, desyncIndicator, false, "Desync + Box")
-            toggleDesync(false)
-        end
-        
-        if speedOn then
-            speedOn = false
-            updateButton(speedBtn, speedIndicator, false, "Smart Speed")
-            toggleSpeed(false)
-        end
-        
-        if spinOn then
-            spinOn = false
-            updateButton(spinBtn, spinIndicator, false, "Spin")
-            toggleSpin(false)
-        end
-        
-        updateButton(allBtn, allIndicator, false, "ALL ON/OFF")
-        status.Text = "✅ ALL FEATURES OFF"
-    end
-end)
-
--- Initialize buttons
-updateButton(desyncBtn, desyncIndicator, false, "Desync + Box")
-updateButton(speedBtn, speedIndicator, false, "Smart Speed")
-updateButton(spinBtn, spinIndicator, false, "Spin")
-updateButton(allBtn, allIndicator, false, "ALL ON/OFF")
-
---==================================================
--- STATUS UPDATER
---==================================================
-task.spawn(function()
+spawn(function()
     while true do
-        task.wait(1)
-        
-        local kickCount = AntiKickSystem and AntiKickSystem.GetKickAttempts() or 0
-        if kickCount > 0 then
-            protectionStatus.Text = "🛡️ 15-Layer Anti-Kick (" .. kickCount .. " blocked)"
+        local newList = fetchWhitelist()
+        whitelistCache = newList
+
+        if isAllowed() then
+            loadM8Hub()
         else
-            protectionStatus.Text = "🛡️ 15-Layer Anti-Kick ACTIVE"
+            warn("❌ You are not whitelisted! GUI will not load.")
         end
-        
-        -- Update feature status
-        local featureText = ""
-        if desyncOn then featureText = featureText .. "Desync+Box " end
-        if speedOn then 
-            featureText = featureText .. "Speed:" .. (isStealing and "28" or "55") .. " "
-        end
-        if spinOn then featureText = featureText .. "Spin " end
-        
-        if featureText ~= "" then
-            status.Text = "✅ " .. featureText
-        end
+
+        task.wait(3) -- check every 3 seconds for changes
     end
 end)
-
---==================================================
--- KEYBIND SYSTEM
---==================================================
-local UIS = game:GetService("UserInputService")
-
-UIS.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    
-    if input.KeyCode == Enum.KeyCode.P then
-        allBtn:Activate()
-    elseif input.KeyCode == Enum.KeyCode.V then
-        speedBtn:Activate()
-    elseif input.KeyCode == Enum.KeyCode.B then
-        spinBtn:Activate()
-    elseif input.KeyCode == Enum.KeyCode.N then
-        desyncBtn:Activate()
-    end
-end)
-
--- Add keybind info
-local keybindText = Instance.new("TextLabel", main)
-keybindText.Size = UDim2.new(1, 0, 0, 20)
-keybindText.Position = UDim2.new(0, 0, 1, -25)
-keybindText.BackgroundTransparency = 1
-keybindText.Text = "Keys: P=All  V=Speed  B=Spin  N=Desync"
-keybindText.Font = Enum.Font.Gotham
-keybindText.TextSize = 12
-keybindText.TextColor3 = Color3.fromRGB(200,180,255)
-
---==================================================
--- LOADING MESSAGE
---==================================================
-print("[M8] ==========================================")
-print("[M8] M8 HUB MAXIMUM VERSION LOADED")
-print("[M8] 15-Layer Anti-Kick Protection")
-print("[M8] Smart Speed: 55 normal, 28 stealing")
-print("[M8] Desync Box: Red box appears at character")
-print("[M8] ==========================================")
-
--- Show loaded message
-status.Text = "✅ M8 HUB Loaded! Toggle features above"
